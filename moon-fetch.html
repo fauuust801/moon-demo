@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<title>月相与周日视运动可视化演示 (希沃白板专版)</title>
+<style>
+    html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; }
+    body {
+        font-family: "Microsoft YaHei","PingFang SC","Hiragino Sans GB","Heiti SC",sans-serif;
+        font-weight: bold;
+        background-color:#1a1a2e; color:#fff; text-align:center;
+        display:-webkit-box; display:-webkit-flex; display:-ms-flexbox; display:flex;
+        -webkit-box-orient:vertical; -webkit-flex-direction:column; -ms-flex-direction:column; flex-direction:column;
+        -webkit-box-align:center; -webkit-align-items:center; -ms-flex-align:center; align-items:center;
+        -webkit-box-pack:start; -webkit-justify-content:flex-start; -ms-flex-pack:start; justify-content:flex-start;
+        padding:1vh 1vw; -webkit-box-sizing:border-box; box-sizing:border-box;
+        -webkit-tap-highlight-color: transparent;
+    }
+    h2 { font-size:3vh; margin:0.5vh 0; letter-spacing:2px; }
+    p  { font-size:1.9vh; margin:0 0 0.8vh 0; color:#a0aab2; font-weight:normal; }
+
+    .controls {
+        background:#0f3460; padding:0.7vh 1.5vw; border-radius:15px;
+        display:-webkit-box; display:-webkit-flex; display:-ms-flexbox; display:flex;
+        -webkit-box-align:center; -webkit-align-items:center; -ms-flex-align:center; align-items:center;
+        -webkit-box-pack:center; -webkit-justify-content:center; -ms-flex-pack:center; justify-content:center;
+        -webkit-flex-wrap:wrap; -ms-flex-wrap:wrap; flex-wrap:wrap;
+        font-size:2.1vh;
+    }
+    .controls > * { margin: 4px 5px; }
+
+    .main-btn {
+        font-family:inherit; font-weight:bold; font-size:2.1vh;
+        background:#e94560; color:#fff; border:none;
+        padding:1vh 2.2vh; border-radius:8px; cursor:pointer;
+        box-shadow:0 4px 6px rgba(0,0,0,0.3);
+        -webkit-appearance:none; appearance:none;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+    .main-btn:active { background:#b32f45; }
+
+    input[type="range"] { width:13vw; min-width:110px; height:2vh; vertical-align:middle; cursor:pointer; }
+    input[type="checkbox"] { width:2.3vh; height:2.3vh; cursor:pointer; vertical-align:middle; }
+    .chk {
+        display:-webkit-inline-box; display:-webkit-inline-flex; display:-ms-inline-flexbox; display:inline-flex;
+        -webkit-box-align:center; -webkit-align-items:center; -ms-flex-align:center; align-items:center;
+        cursor:pointer;
+    }
+    .chk input { margin-right:6px; }
+
+    .seg-label { font-size:2.1vh; color:#c9d6e2; }
+    .seg {
+        display:-webkit-inline-box; display:-webkit-inline-flex; display:-ms-inline-flexbox; display:inline-flex;
+        border-radius:8px; overflow:hidden;
+        border:2px solid #537895;
+        background:#16213e;
+    }
+    .seg-btn {
+        font-family:inherit; font-weight:bold; font-size:2vh;
+        background:#16213e; color:#9fb3c8;
+        border:none; border-right:1px solid #537895;
+        padding:0.9vh 1.3vh; cursor:pointer;
+        -webkit-appearance:none; appearance:none;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+    .seg-btn:last-child { border-right:none; }
+    .seg-btn.active { background:#e94560; color:#fff; }
+
+    .info {
+        font-size:3.4vh; margin:0.8vh 0; color:#e94560;
+        text-shadow:2px 2px 4px rgba(0,0,0,0.5); white-space:nowrap;
+    }
+
+    .stage {
+        -webkit-box-flex:1; -webkit-flex:1 1 auto; -ms-flex:1 1 auto; flex:1 1 auto;
+        width:96vw;
+        min-height:180px;         /* 关键：给 stage 一个回退高度 */
+        margin-top:0.6vh;
+        display:-webkit-box; display:-webkit-flex; display:-ms-flexbox; display:flex;
+        -webkit-box-align:center; -webkit-align-items:center; -ms-flex-align:center; align-items:center;
+        -webkit-box-pack:center; -webkit-justify-content:center; -ms-flex-pack:center; justify-content:center;
+        position: relative;
+    }
+    canvas {
+        display:block; background-color:#16213e; border-radius:15px;
+        box-shadow:0 8px 25px rgba(0,0,0,0.6);
+        /* 关键：不再用 max-width/max-height 100%，尺寸完全由 JS 控制 */
+        touch-action: manipulation;
+    }
+
+    /* 错误提示（仅当 JS 异常时显示） */
+    #errBox {
+        display:none; position:fixed; left:10px; right:10px; top:10px;
+        background:#b32f45; color:#fff; padding:14px 18px; border-radius:10px;
+        font-size:15px; text-align:left; line-height:1.5; z-index:9999;
+        box-shadow:0 4px 14px rgba(0,0,0,0.5); word-break:break-all;
+    }
+</style>
+</head>
+<body>
+
+<div id="errBox"></div>
+
+<h2>月球周日视运动 vs 月公转滞后 演示</h2>
+<p>面向南方：左侧为东，右侧为西。月亮图标实时显示月相。默认 3 秒走过一天。</p>
+
+<div class="controls">
+    <button id="btnPlay"  type="button" class="main-btn">播放 / 暂停</button>
+    <button id="btnReset" type="button" class="main-btn">重置到初一</button>
+
+    <label for="speed">速度：</label>
+    <input type="range" id="speed" min="0.5" max="3" step="0.25" value="1">
+
+    <span class="seg-label">轨迹时刻：</span>
+    <div class="seg" id="segGroup">
+        <button type="button" class="seg-btn"        data-hour="6">6:00</button>
+        <button type="button" class="seg-btn"        data-hour="12">12:00</button>
+        <button type="button" class="seg-btn active" data-hour="18">18:00</button>
+        <button type="button" class="seg-btn"        data-hour="24">24:00</button>
+    </div>
+
+    <label class="chk" for="showTrail">
+        <input type="checkbox" id="showTrail" checked>
+        显示轨迹
+    </label>
+</div>
+
+<div class="info" id="timeDisplay">农历：初一 | 时间：00:00</div>
+
+<div class="stage" id="stage">
+    <canvas id="skyCanvas" width="1920" height="900"></canvas>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ============================================================
+     *  0. 全局错误显示（这是排查 PC 微信问题的关键）
+     * ============================================================ */
+    var errBox = document.getElementById('errBox');
+    function showError(msg) {
+        try {
+            if (errBox) {
+                errBox.style.display = 'block';
+                errBox.textContent = '⚠ 出错：' + msg + '  （请把此信息截图反馈）';
+            }
+        } catch (e) {}
+    }
+    window.onerror = function (msg, url, line, col) {
+        showError(msg + ' @' + line + ':' + col);
+        return false;
+    };
+
+    /* ============================================================
+     *  1. 兼容性垫片
+     * ============================================================ */
+    var raf = window.requestAnimationFrame ||
+              window.webkitRequestAnimationFrame ||
+              window.mozRequestAnimationFrame ||
+              window.msRequestAnimationFrame ||
+              function (cb) { return window.setTimeout(function () { cb(+new Date()); }, 16); };
+
+    function nowTs() {
+        return (window.performance && performance.now) ? performance.now() : (+new Date());
+    }
+
+    // 极简 bind（不使用第三个参数对象，只用布尔值，避免老浏览器报错）
+    function bind(el, evt, fn) {
+        if (!el) { return; }
+        try {
+            if (el.addEventListener) { el.addEventListener(evt, fn, false); }
+            else if (el.attachEvent) { el.attachEvent('on' + evt, fn); }
+        } catch (e) {}
+    }
+
+    // 通用的"点击"处理：同时支持 touch 和 click，且不会互相干扰
+    function onTap(el, fn) {
+        if (!el) { return; }
+        var touched = false;
+        bind(el, 'touchstart', function () { touched = true; });
+        bind(el, 'touchend', function (e) {
+            if (touched) {
+                touched = false;
+                if (e && e.preventDefault) { try { e.preventDefault(); } catch (er) {} }
+                try { fn(e); } catch (er) { showError(er.message || String(er)); }
+            }
+        });
+        bind(el, 'click', function (e) {
+            if (!touched) {
+                try { fn(e); } catch (er) { showError(er.message || String(er)); }
+            }
+        });
+    }
+
+    /* ============================================================
+     *  2. 布局常量（逻辑坐标系 1920×900）
+     * ============================================================ */
+    var LW = 1920, LH = 900;
+    var CX = LW / 2;
+    var CY = 620;
+    var RX = 900;
+    var RY = 580;
+
+    var DELAY = 50 / 60;
+    var TOTAL_DAYS = 30;
+    var BASE_SPEED = 8;
+
+    /* ============================================================
+     *  3. 获取 DOM 与 Canvas
+     * ============================================================ */
+    var canvas = document.getElementById('skyCanvas');
+    var stage  = document.getElementById('stage');
+    var ctx = null;
+
+    if (!canvas) {
+        showError('找不到 canvas 元素');
+        return;
+    }
+
+    // 安全获取 2D 上下文
+    try {
+        if (typeof canvas.getContext === 'function') {
+            ctx = canvas.getContext('2d');
+        }
+    } catch (e) {
+        ctx = null;
+    }
+
+    if (!ctx) {
+        showError('当前浏览器不支持 Canvas 2D');
+        return;
+    }
+
+    var speedEl     = document.getElementById('speed');
+    var trailEl     = document.getElementById('showTrail');
+    var timeDisplay = document.getElementById('timeDisplay');
+    var btnPlay     = document.getElementById('btnPlay');
+    var btnReset    = document.getElementById('btnReset');
+
+    var segBtns = [];
+    try {
+        var list = document.querySelectorAll('#segGroup .seg-btn');
+        if (list && list.length) {
+            for (var si = 0; si < list.length; si++) { segBtns.push(list[si]); }
+        }
+    } catch (e) { segBtns = []; }
+
+    /* ============================================================
+     *  4. 状态
+     * ============================================================ */
+    var timeHours   = 0;
+    var playing     = false;
+    var snapHour    = 18;
+    var lastTs      = 0;
+    var lastRafTime = 0;
+    var layoutReady = false;
+
+    /* ============================================================
+     *  5. 工具函数
+     * ============================================================ */
+    var CN = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+    function lunarName(d) {
+        if (d <= 0) { return '初一'; }
+        if (d < 10) { return '初' + CN[d]; }
+        if (d === 10) { return '初十'; }
+        if (d < 20) { return '十' + CN[d - 10]; }
+        if (d === 20) { return '二十'; }
+        if (d < 30) { return '廿' + CN[d - 20]; }
+        if (d === 30) { return '三十'; }
+        return '第' + d + '天';
+    }
+    function pad2(n) { n = Math.floor(n); return (n < 10 ? '0' : '') + n; }
+
+    /* ============================================================
+     *  6. 自适应布局（PC 微信重点修复）
+     * ============================================================ */
+    function layout() {
+        try {
+            // ---- 1. 优先尝试 stage 的尺寸 ----
+            var aw = 0, ah = 0;
+            if (stage) {
+                aw = stage.clientWidth  || 0;
+                ah = stage.clientHeight || 0;
+
+                // clientHeight 为 0 时，用 getBoundingClientRect 再试
+                if ((!ah || ah < 40) && stage.getBoundingClientRect) {
+                    var r = stage.getBoundingClientRect();
+                    if (r) {
+                        if (!aw || aw < 40) { aw = r.width  || 0; }
+                        if (!ah || ah < 40) { ah = r.height || 0; }
+                    }
+                }
+            }
+
+            // ---- 2. 兜底：用窗口尺寸估算 ----
+            var winW = window.innerWidth  || document.documentElement.clientWidth  || 1024;
+            var winH = window.innerHeight || document.documentElement.clientHeight || 768;
+
+            if (!aw || aw < 60) { aw = winW * 0.96; }
+            if (!ah || ah < 60) { ah = winH * 0.55; }   // 剩余空间估算
+
+            // ---- 3. 强制合理的最小值，避免 0 尺寸导致空白 ----
+            if (aw < 320) { aw = 320; }
+            if (ah < 180) { ah = 180; }
+
+            // ---- 4. 等比适配到 16:9 ----
+            var ratio = LW / LH;
+            var w = aw;
+            var h = aw / ratio;
+            if (h > ah) { h = ah; w = h * ratio; }
+            if (w < 40 || h < 40) { w = 640; h = 360; }
+
+            // ---- 5. 直接控制 canvas 的显示尺寸（不用 CSS 的 max-*） ----
+            canvas.style.width     = Math.round(w) + 'px';
+            canvas.style.height    = Math.round(h) + 'px';
+            canvas.style.maxWidth  = 'none';
+            canvas.style.maxHeight = 'none';
+
+            // ---- 6. 处理高 DPI：最多 2 倍，避免性能问题 ----
+            var dpr = window.devicePixelRatio || 1;
+            if (dpr < 1) { dpr = 1; }
+            if (dpr > 2) { dpr = 2; }
+
+            var cw = Math.round(LW * dpr);
+            var ch = Math.round(LH * dpr);
+            if (canvas.width  !== cw) { canvas.width  = cw; }
+            if (canvas.height !== ch) { canvas.height = ch; }
+
+            // ---- 7. 设定变换，让绘图坐标仍按逻辑坐标走 ----
+            if (ctx.setTransform) {
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            } else if (ctx.resetTransform) {
+                ctx.resetTransform();
+                ctx.scale(dpr, dpr);
+            } else {
+                ctx.scale(dpr, dpr);
+            }
+
+            layoutReady = true;
+            drawSky();
+
+        } catch (e) {
+            showError('布局错误：' + (e.message || String(e)));
+        }
+    }
+
+    /* ============================================================
+     *  7. 椭圆路径辅助
+     * ============================================================ */
+    function domePath() {
+        ctx.beginPath();
+        if (ctx.ellipse) {
+            ctx.ellipse(CX, CY, RX, RY, 0, Math.PI, 0, false);
+        } else {
+            var k = 0.5522847498;
+            ctx.moveTo(CX - RX, CY);
+            ctx.bezierCurveTo(CX - RX, CY - RY * k, CX - RX * k, CY - RY, CX, CY - RY);
+            ctx.bezierCurveTo(CX + RX * k, CY - RY, CX + RX, CY - RY * k, CX + RX, CY);
+        }
+    }
+
+    function ellipseArc(cx, cy, rx, ry, start, end, ccw) {
+        var steps = 44;
+        var range = end - start;
+        if (ccw) { while (range >= 0) { range -= Math.PI * 2; } }
+        else     { while (range <= 0) { range += Math.PI * 2; } }
+        for (var i = 0; i <= steps; i++) {
+            var t = start + range * (i / steps);
+            ctx.lineTo(cx + rx * Math.cos(t), cy + ry * Math.sin(t));
+        }
+    }
+
+    /* ============================================================
+     *  8. 月相绘制
+     * ============================================================ */
+    function drawPhase(cx, cy, r, phase) {
+        phase = ((phase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+        var cosP = Math.cos(phase);
+        var f = (1 - cosP) / 2;
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = '#2e2e42';
+        ctx.fill();
+
+        if (f < 0.01) { return; }
+
+        var a = r * Math.abs(cosP);
+        ctx.beginPath();
+
+        if (phase < Math.PI) {
+            ctx.arc(cx, cy, r, -Math.PI / 2, Math.PI / 2, false);
+            if (cosP > 0) { ellipseArc(cx, cy, a, r, Math.PI / 2, -Math.PI / 2, true); }
+            else          { ellipseArc(cx, cy, a, r, Math.PI / 2, Math.PI * 1.5, false); }
+        } else {
+            ctx.arc(cx, cy, r, Math.PI / 2, Math.PI * 1.5, false);
+            if (cosP < 0) { ellipseArc(cx, cy, a, r, Math.PI * 1.5, Math.PI / 2, false); }
+            else          { ellipseArc(cx, cy, a, r, Math.PI * 1.5, Math.PI / 2, true); }
+        }
+
+        ctx.closePath();
+        ctx.fillStyle = '#f2f2f2';
+        ctx.fill();
+    }
+
+    /* ============================================================
+     *  9. 天体绘制
+     * ============================================================ */
+    function posOf(angle) {
+        return { x: CX - RX * Math.cos(angle), y: CY - RY * Math.sin(angle) };
+    }
+
+    function drawBody(angle, opts) {
+        var p = posOf(angle);
+        var below = (p.y > CY);
+        var r = opts.r || 35;
+
+        if (below && !opts.snapshot) { return; }
+        if (p.y > LH - 5) { return; }
+
+        ctx.save();
+
+        if (opts.type === 'moon') {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, r + 6, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(220,220,220,0.13)';
+            ctx.fill();
+
+            drawPhase(p.x, p.y, r, opts.phase);
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+        } else if (opts.type === 'sun') {
+            var g = ctx.createRadialGradient(p.x, p.y, r * 0.5, p.x, p.y, r * 2.2);
+            g.addColorStop(0, 'rgba(249,215,28,0.5)');
+            g.addColorStop(1, 'rgba(249,215,28,0)');
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, r * 2.2, 0, Math.PI * 2);
+            ctx.fillStyle = g;
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+            ctx.fillStyle = '#f9d71c';
+            ctx.fill();
+
+        } else if (opts.type === 'snapshot') {
+            ctx.globalAlpha = below ? 0.28 : 0.7;
+            drawPhase(p.x, p.y, r, opts.phase);
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(200,200,200,0.5)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        if (opts.label) {
+            ctx.globalAlpha = below ? 0.5 : 1;
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold ' + (opts.type === 'snapshot' ? 22 : 38) + 'px "Microsoft YaHei", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(opts.label, p.x, p.y - r - 10);
+        }
+
+        ctx.restore();
+    }
+
+    /* ============================================================
+     * 10. 主绘制
+     * ============================================================ */
+    function drawSky() {
+        if (!layoutReady) { return; }
+
+        try {
+            ctx.clearRect(0, 0, LW, LH);
+
+            ctx.fillStyle = 'rgba(5,5,15,0.35)';
+            ctx.fillRect(0, CY, LW, LH - CY);
+
+            domePath();
+            ctx.fillStyle = '#0f3460';
+            ctx.fill();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#537895';
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(0, CY);
+            ctx.lineTo(LW, CY);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 44px "Microsoft YaHei", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('东 (East)',  CX - RX * 0.8, CY + 55);
+            ctx.fillText('南 (South)', CX,            CY + 55);
+            ctx.fillText('西 (West)',  CX + RX * 0.8, CY + 55);
+
+            ctx.fillStyle = '#e94560';
+            ctx.fillRect(CX - 14, CY - 60, 28, 60);
+            ctx.beginPath();
+            ctx.arc(CX, CY - 76, 19, 0, Math.PI * 2);
+            ctx.fill();
+
+            var totalDays = timeHours / 24;
+            var day = Math.floor(totalDays) + 1;
+            if (day < 1) { day = 1; }
+            if (day > TOTAL_DAYS) { day = TOTAL_DAYS; }
+
+            var hourOfDay = timeHours - (day - 1) * 24;
+            if (hourOfDay < 0) { hourOfDay = 0; }
+            if (hourOfDay >= 24) { hourOfDay = 23.9999; }
+
+            var phaseAngle = totalDays * DELAY / 12 * Math.PI;
+
+            // ---- 轨迹印记 ----
+            if (trailEl && trailEl.checked) {
+                var maxDayShown;
+                if (snapHour >= 24)             { maxDayShown = day - 1; }
+                else if (hourOfDay >= snapHour) { maxDayShown = day; }
+                else                            { maxDayShown = day - 1; }
+                if (maxDayShown > TOTAL_DAYS) { maxDayShown = TOTAL_DAYS; }
+
+                for (var k = 1; k <= maxDayShown; k++) {
+                    var snapTime  = snapHour - (k - 1) * DELAY;
+                    var snapAngle = (snapTime - 6) / 12 * Math.PI;
+                    var snapPhase = (k - 1) * DELAY / 12 * Math.PI;
+                    drawBody(snapAngle, {
+                        type: 'snapshot', r: 24, phase: snapPhase,
+                        label: lunarName(k), snapshot: true
+                    });
+                }
+            }
+
+            // ---- 太阳 ----
+            var sunAngle = (hourOfDay - 6) / 12 * Math.PI;
+            if (sunAngle > -0.15 && sunAngle < Math.PI + 0.15) {
+                drawBody(sunAngle, { type: 'sun', r: 38, label: '太阳' });
+            }
+
+            // ---- 月亮 ----
+            var moonTime  = hourOfDay - (day - 1) * DELAY;
+            var moonAngle = (moonTime - 6) / 12 * Math.PI;
+            if (moonAngle > -0.15 && moonAngle < Math.PI + 0.15) {
+                drawBody(moonAngle, { type: 'moon', r: 46, phase: phaseAngle, label: '月亮' });
+            }
+
+            // ---- 信息栏 ----
+            var hh = pad2(hourOfDay);
+            var mm = pad2((hourOfDay - Math.floor(hourOfDay)) * 60);
+            if (timeDisplay) {
+                timeDisplay.textContent = '农历：' + lunarName(day) + ' | 时间：' + hh + ':' + mm;
+            }
+        } catch (e) {
+            showError('绘制错误：' + (e.message || String(e)));
+        }
+    }
+
+    /* ============================================================
+     * 11. 单步推进
+     * ============================================================ */
+    function step(ts) {
+        if (!lastTs) { lastTs = ts; }
+        var dt = (ts - lastTs) / 1000;
+        lastTs = ts;
+
+        if (dt < 0)    { dt = 0; }
+        if (dt > 0.15) { dt = 0.15; }
+
+        if (!playing) { return; }
+
+        var sp = 1;
+        try { sp = parseFloat(speedEl.value); } catch (e) {}
+        if (isNaN(sp)) { sp = 1; }
+
+        timeHours += sp * BASE_SPEED * dt;
+        if (timeHours >= TOTAL_DAYS * 24) { timeHours = 0; }
+
+        drawSky();
+    }
+
+    /* ============================================================
+     * 12. 主循环
+     * ============================================================ */
+    function loop(ts) {
+        if (typeof ts !== 'number') { ts = nowTs(); }
+        lastRafTime = ts;
+        step(ts);
+        raf(loop);
+    }
+
+    // 兜底定时器：微信 / X5 中 rAF 有时会被暂停，靠它续命
+    setInterval(function () {
+        var ts = nowTs();
+        if (ts - lastRafTime > 120) {
+            step(ts);
+        }
+    }, 60);
+
+    /* ============================================================
+     * 13. 交互
+     * ============================================================ */
+    function togglePlay() {
+        playing = !playing;
+        lastTs = 0;
+        // 立即重绘一次，让用户看到按钮响应
+        drawSky();
+    }
+
+    function resetAll() {
+        timeHours = 0;
+        playing = false;
+        lastTs = 0;
+        drawSky();
+    }
+
+    function updateSegActive() {
+        for (var i = 0; i < segBtns.length; i++) {
+            var b = segBtns[i];
+            if (!b) { continue; }
+            var h = parseInt(b.getAttribute('data-hour'), 10);
+            if (h === snapHour) {
+                if (b.className.indexOf('active') === -1) { b.className = 'seg-btn active'; }
+            } else {
+                b.className = 'seg-btn';
+            }
+        }
+    }
+
+    // 立即绑定按钮（在任何可能出错的初始化之前）
+    onTap(btnPlay,  togglePlay);
+    onTap(btnReset, resetAll);
+    bind(trailEl, 'change', drawSky);
+
+    for (var bi = 0; bi < segBtns.length; bi++) {
+        (function (btn) {
+            onTap(btn, function () {
+                var h = parseInt(btn.getAttribute('data-hour'), 10);
+                if (!isNaN(h)) {
+                    snapHour = h;
+                    updateSegActive();
+                    drawSky();
+                }
+            });
+        })(segBtns[bi]);
+    }
+
+    bind(document, 'keydown', function (e) {
+        var k = e.keyCode || e.which;
+        var t = e.target || e.srcElement;
+        var tag = t && t.tagName ? t.tagName.toUpperCase() : '';
+        if (tag === 'BUTTON' || tag === 'INPUT') { return; }
+        if (k === 32) {
+            if (e.preventDefault) { try { e.preventDefault(); } catch (er) {} }
+            togglePlay();
+        }
+    });
+
+    bind(window, 'resize', function () { setTimeout(layout, 50); });
+    bind(window, 'orientationchange', function () { setTimeout(layout, 300); });
+
+    // 页面回到前台：重置时间基准
+    bind(document, 'visibilitychange', function () {
+        if (!document.hidden) {
+            lastTs = 0;
+            lastRafTime = 0;
+            setTimeout(layout, 30);
+        }
+    });
+    bind(window, 'pageshow', function () {
+        lastTs = 0;
+        lastRafTime = 0;
+        setTimeout(layout, 30);
+    });
+    bind(window, 'focus', function () {
+        lastTs = 0;
+    });
+
+    /* ============================================================
+     * 14. 启动
+     * ============================================================ */
+    function boot() {
+        try {
+            updateSegActive();
+        } catch (e) { /* 不阻断主流程 */ }
+
+        try {
+            layout();
+        } catch (e) {
+            showError('启动布局失败：' + (e.message || String(e)));
+        }
+
+        // 多次延迟重布局：解决微信首帧尺寸不准的问题
+        setTimeout(layout, 80);
+        setTimeout(layout, 300);
+        setTimeout(layout, 800);
+
+        // 启动主循环
+        raf(loop);
+    }
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        boot();
+    } else {
+        bind(document, 'DOMContentLoaded', boot);
+    }
+    bind(window, 'load', function () { setTimeout(layout, 30); });
+
+})();
+</script>
+</body>
+</html>
